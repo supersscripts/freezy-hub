@@ -1,0 +1,4292 @@
+-- ❄️ freezy hub
+
+print("freezy hub on top")
+print("https://discord.gg/HujpbWQhcw")
+
+local Players = game:GetService("Players")
+
+local RunService = game:GetService("RunService")
+
+local UserInputService = game:GetService("UserInputService")
+
+local TweenService = game:GetService("TweenService")
+
+local Workspace = game:GetService("Workspace")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+
+
+local player = Players.LocalPlayer
+
+local playerGui = player:WaitForChild("PlayerGui")
+
+
+
+-- setup
+
+
+
+local scriptKilled = false
+
+local connections = {}
+
+
+
+local pullStickyEnabled = false
+
+local pullStrength = 0
+
+local stickiness = 0
+
+
+
+-- boost
+
+
+
+local boostEnabled = false
+
+local MIN_DISPLAY_BOOST = 0
+
+local MAX_DISPLAY_BOOST = 50
+
+local MIN_ACTUAL_BOOST = 75
+
+local MAX_ACTUAL_BOOST = 999
+
+local boostStrength = 0
+
+
+
+local function getActualBoostStrength()
+
+if boostStrength <= 0 then
+
+return 0
+
+end
+
+
+
+return math.round(
+
+MIN_ACTUAL_BOOST
+
++ ((boostStrength - 1) / 49)
+
+* (MAX_ACTUAL_BOOST - MIN_ACTUAL_BOOST)
+
+)
+
+end
+
+
+
+-- dive boost
+
+
+
+local diveEnabled = false
+
+local MIN_DISPLAY_DIVE = 0
+
+local MAX_DISPLAY_DIVE = 50
+
+local MIN_ACTUAL_DIVE = 2.2
+
+local MAX_ACTUAL_DIVE = 10
+
+local diveBoostPower = 0
+
+
+
+local function getActualDiveStrength()
+
+if diveBoostPower <= 0 then
+
+return 0
+
+end
+
+
+
+return MIN_ACTUAL_DIVE
+
++ ((diveBoostPower - 1) / 49)
+
+* (MAX_ACTUAL_DIVE - MIN_ACTUAL_DIVE)
+
+end
+
+
+
+-- arm extender
+
+
+
+local armExtenderEnabled = false
+
+local footballAuraEnabled = false
+
+local BALL_NAME = "Football"
+
+local MAX_ARM_REACH = 15
+
+local ARM_EXTENSION = 0.1
+
+local TOP_CONTACT_TOLERANCE = 2.5
+
+local isAirborne = false
+
+local boostedThisJump = false
+
+local isClicking = false
+
+local cachedFootball = nil
+
+local lastBallPosition = nil
+
+local lastScanTime = 0
+
+local SCAN_INTERVAL = 0.25
+
+
+
+local character
+
+local rootPart
+
+local humanoid
+
+local trackedShoulder
+
+local originalC0
+
+
+
+-- football aura
+
+
+
+local catchBall = nil
+
+local catchDots = {}
+
+local catchDotAnchors = {}
+
+local catchScanWait = 0
+
+local catchHolding = false
+
+local catchLastPhys = 0
+
+local catchRange = 15
+
+local catchPull = 2.5
+
+local CATCH_LOCK_DIST = 1.5
+
+local CATCH_SCAN_INTERVAL = 0.08
+
+local lastCatchBallScan = 0
+
+
+
+local CATCH_DOT_COLS = {
+
+Color3.fromRGB(170, 225, 255),
+
+Color3.fromRGB(150, 215, 255),
+
+Color3.fromRGB(130, 205, 255),
+
+Color3.fromRGB(110, 195, 255),
+
+Color3.fromRGB(90, 180, 255),
+
+Color3.fromRGB(75, 165, 255),
+
+Color3.fromRGB(60, 150, 245),
+
+Color3.fromRGB(45, 135, 235),
+
+Color3.fromRGB(35, 120, 225),
+
+Color3.fromRGB(35, 115, 220),
+
+Color3.fromRGB(45, 125, 230),
+
+Color3.fromRGB(60, 140, 240),
+
+Color3.fromRGB(75, 155, 250),
+
+Color3.fromRGB(95, 175, 255),
+
+Color3.fromRGB(115, 195, 255),
+
+Color3.fromRGB(140, 210, 255),
+
+Color3.fromRGB(165, 225, 255),
+
+Color3.fromRGB(190, 235, 255),
+
+Color3.fromRGB(215, 245, 255),
+
+Color3.fromRGB(235, 250, 255),
+
+}
+
+
+
+-- connections
+
+
+
+local function connect(signal, callback)
+
+if scriptKilled then
+
+return nil
+
+end
+
+
+
+local connection = signal:Connect(callback)
+
+table.insert(connections, connection)
+
+return connection
+
+end
+
+
+
+-- colors
+
+
+
+local COLORS = {
+
+DeepBlue = Color3.fromRGB(18, 55, 120),
+
+Blue = Color3.fromRGB(35, 115, 220),
+
+BrightBlue = Color3.fromRGB(75, 165, 255),
+
+BabyBlue = Color3.fromRGB(170, 225, 255),
+
+IceBlue = Color3.fromRGB(215, 242, 255),
+
+White = Color3.fromRGB(255, 255, 255),
+
+Text = Color3.fromRGB(15, 45, 85),
+
+}
+
+
+
+local TOGGLE_KEY = Enum.KeyCode.RightControl
+
+
+
+-- menu
+
+
+
+local gui = Instance.new("ScreenGui")
+
+gui.Name = "FreezyHub"
+
+gui.ResetOnSpawn = false
+
+gui.IgnoreGuiInset = true
+
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+gui.Parent = playerGui
+
+
+
+local mainFrame = Instance.new("Frame")
+
+mainFrame.Name = "MainFrame"
+
+mainFrame.Size = UDim2.fromOffset(360, 560)
+
+mainFrame.Position = UDim2.new(0.5, -180, 0.5, -280)
+
+mainFrame.BackgroundColor3 = COLORS.IceBlue
+
+mainFrame.BackgroundTransparency = 0.12
+
+mainFrame.BorderSizePixel = 0
+
+mainFrame.ClipsDescendants = true
+
+mainFrame.Active = true
+
+mainFrame.Parent = gui
+
+
+
+local mainCorner = Instance.new("UICorner")
+
+mainCorner.CornerRadius = UDim.new(0, 16)
+
+mainCorner.Parent = mainFrame
+
+
+
+local mainGradient = Instance.new("UIGradient")
+
+mainGradient.Color = ColorSequence.new({
+
+ColorSequenceKeypoint.new(0, COLORS.IceBlue),
+
+ColorSequenceKeypoint.new(0.45, COLORS.BrightBlue),
+
+ColorSequenceKeypoint.new(1, COLORS.DeepBlue),
+
+})
+
+mainGradient.Rotation = 135
+
+mainGradient.Parent = mainFrame
+
+
+
+local glow = Instance.new("Frame")
+
+glow.Name = "InnerGlow"
+
+glow.Size = UDim2.new(1, -8, 1, -8)
+
+glow.Position = UDim2.fromOffset(4, 4)
+
+glow.BackgroundColor3 = COLORS.White
+
+glow.BackgroundTransparency = 0.91
+
+glow.BorderSizePixel = 0
+
+glow.ZIndex = 1
+
+glow.Parent = mainFrame
+
+
+
+local glowCorner = Instance.new("UICorner")
+
+glowCorner.CornerRadius = UDim.new(0, 14)
+
+glowCorner.Parent = glow
+
+
+
+-- snow
+
+
+
+local snowContainer = Instance.new("Frame")
+
+snowContainer.Name = "SnowContainer"
+
+snowContainer.Size = UDim2.fromScale(1, 1)
+
+snowContainer.BackgroundTransparency = 1
+
+snowContainer.ClipsDescendants = true
+
+snowContainer.ZIndex = 2
+
+snowContainer.Parent = mainFrame
+
+
+
+local snowflakes = {}
+
+
+
+math.randomseed(math.floor(os.clock() * 100000))
+
+
+
+for i = 1, 55 do
+
+local flake = Instance.new("Frame")
+
+local size = math.random(2, 6)
+
+
+
+flake.Size = UDim2.fromOffset(size, size)
+
+flake.Position = UDim2.new(
+
+math.random(0, 100) / 100,
+
+0,
+
+math.random(-20, 100) / 100,
+
+0
+
+)
+
+flake.BackgroundColor3 = COLORS.White
+
+flake.BackgroundTransparency = math.random(5, 35) / 100
+
+flake.BorderSizePixel = 0
+
+flake.ZIndex = 2
+
+flake.Parent = snowContainer
+
+
+
+local corner = Instance.new("UICorner")
+
+corner.CornerRadius = UDim.new(1, 0)
+
+corner.Parent = flake
+
+
+
+table.insert(snowflakes, {
+
+Object = flake,
+
+Speed = math.random(15, 45) / 1000,
+
+Drift = math.random(-12, 12) / 100000,
+
+Rotation = math.random(-2, 2),
+
+})
+
+end
+
+
+
+-- header
+
+
+
+local innerCard = Instance.new("Frame")
+
+innerCard.Size = UDim2.new(1, -14, 1, -14)
+
+innerCard.Position = UDim2.fromOffset(7, 7)
+
+innerCard.BackgroundTransparency = 1
+
+innerCard.BorderSizePixel = 0
+
+innerCard.ZIndex = 5
+
+innerCard.Parent = mainFrame
+
+
+
+local headerFrame = Instance.new("Frame")
+
+headerFrame.Size = UDim2.new(1, 0, 0, 94)
+
+headerFrame.BackgroundTransparency = 1
+
+headerFrame.Active = true
+
+headerFrame.ZIndex = 10
+
+headerFrame.Parent = innerCard
+
+
+
+local titleLabel = Instance.new("TextLabel")
+
+titleLabel.Size = UDim2.new(1, 0, 0, 30)
+
+titleLabel.Position = UDim2.fromOffset(0, 5)
+
+titleLabel.BackgroundTransparency = 1
+
+titleLabel.Text = "FREEZY HUB"
+
+titleLabel.TextColor3 = COLORS.DeepBlue
+
+titleLabel.TextSize = 20
+
+titleLabel.Font = Enum.Font.GothamBold
+
+titleLabel.ZIndex = 11
+
+titleLabel.Parent = headerFrame
+
+
+
+local controlsTitle = Instance.new("TextLabel")
+
+controlsTitle.Size = UDim2.new(1, 0, 0, 18)
+
+controlsTitle.Position = UDim2.fromOffset(0, 38)
+
+controlsTitle.BackgroundTransparency = 1
+
+controlsTitle.Text = "CONTROLS:"
+
+controlsTitle.TextColor3 = COLORS.DeepBlue
+
+controlsTitle.TextSize = 11
+
+controlsTitle.Font = Enum.Font.GothamBold
+
+controlsTitle.ZIndex = 11
+
+controlsTitle.Parent = headerFrame
+
+
+
+local controlsLabel = Instance.new("TextLabel")
+
+controlsLabel.Size = UDim2.new(1, -20, 0, 36)
+
+controlsLabel.Position = UDim2.fromOffset(10, 55)
+
+controlsLabel.BackgroundTransparency = 1
+
+controlsLabel.Text =
+
+"R1 | Pull Sticky   R | Pull Sticky\n"
+
+.. "L1 | Boost   T | Boost\n"
+
+.. "\n"
+
+.. "Right Ctrl / DPad Right | Hide/Show GUI"
+
+controlsLabel.TextColor3 = COLORS.Text
+
+controlsLabel.TextSize = 9
+
+controlsLabel.Font = Enum.Font.GothamMedium
+
+controlsLabel.TextWrapped = true
+
+controlsLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+controlsLabel.ZIndex = 11
+
+controlsLabel.Parent = headerFrame
+
+
+
+-- content
+
+
+
+local listFrame = Instance.new("ScrollingFrame")
+
+listFrame.Name = "Content"
+
+listFrame.Size = UDim2.new(1, -16, 1, -104)
+
+listFrame.Position = UDim2.fromOffset(8, 98)
+
+listFrame.BackgroundTransparency = 1
+
+listFrame.BorderSizePixel = 0
+
+listFrame.ScrollBarThickness = 0
+
+listFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+
+listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+listFrame.CanvasSize = UDim2.new()
+
+listFrame.Active = true
+
+listFrame.ZIndex = 10
+
+listFrame.Parent = innerCard
+
+
+
+local listLayout = Instance.new("UIListLayout")
+
+listLayout.Padding = UDim.new(0, 7)
+
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+listLayout.Parent = listFrame
+
+
+
+local listPadding = Instance.new("UIPadding")
+
+listPadding.PaddingLeft = UDim.new(0, 4)
+
+listPadding.PaddingRight = UDim.new(0, 4)
+
+listPadding.PaddingBottom = UDim.new(0, 12)
+
+listPadding.Parent = listFrame
+
+
+
+local rowOrder = 0
+
+
+
+-- dragging
+
+
+
+local dragging = false
+
+local dragStart
+
+local dragStartPosition
+
+local dragTargetPosition = mainFrame.Position
+
+
+
+connect(headerFrame.InputBegan, function(input)
+
+if input.UserInputType ~= Enum.UserInputType.MouseButton1
+
+and input.UserInputType ~= Enum.UserInputType.Touch then
+
+return
+
+end
+
+
+
+dragging = true
+
+dragStart = input.Position
+
+dragStartPosition = mainFrame.Position
+
+dragTargetPosition = mainFrame.Position
+
+end)
+
+
+
+connect(UserInputService.InputChanged, function(input)
+
+if not dragging then
+
+return
+
+end
+
+
+
+if input.UserInputType == Enum.UserInputType.MouseMovement
+
+or input.UserInputType == Enum.UserInputType.Touch then
+
+
+
+local delta = input.Position - dragStart
+
+
+
+dragTargetPosition = UDim2.new(
+
+dragStartPosition.X.Scale,
+
+dragStartPosition.X.Offset + delta.X,
+
+dragStartPosition.Y.Scale,
+
+dragStartPosition.Y.Offset + delta.Y
+
+)
+
+end
+
+end)
+
+
+
+connect(UserInputService.InputEnded, function(input)
+
+if input.UserInputType == Enum.UserInputType.MouseButton1
+
+or input.UserInputType == Enum.UserInputType.Touch then
+
+dragging = false
+
+end
+
+end)
+
+
+
+connect(RunService.RenderStepped, function(dt)
+
+if scriptKilled or not dragging then
+
+return
+
+end
+
+
+
+local current = mainFrame.Position
+
+local alpha = 1 - math.exp(-dt * 18)
+
+
+
+mainFrame.Position = UDim2.new(
+
+dragTargetPosition.X.Scale,
+
+current.X.Offset
+
++ (dragTargetPosition.X.Offset - current.X.Offset) * alpha,
+
+dragTargetPosition.Y.Scale,
+
+current.Y.Offset
+
++ (dragTargetPosition.Y.Offset - current.Y.Offset) * alpha
+
+)
+
+end)
+
+
+
+-- ui
+
+
+
+local function makeSeparator(text)
+
+rowOrder += 1
+
+
+
+local frame = Instance.new("Frame")
+
+frame.Size = UDim2.new(1, 0, 0, 22)
+
+frame.BackgroundTransparency = 1
+
+frame.LayoutOrder = rowOrder
+
+frame.ZIndex = 12
+
+frame.Parent = listFrame
+
+
+
+local left = Instance.new("Frame")
+
+left.Size = UDim2.new(0.31, 0, 0, 2)
+
+left.Position = UDim2.new(0, 0, 0.5, -1)
+
+left.BackgroundColor3 = COLORS.DeepBlue
+
+left.BackgroundTransparency = 0.25
+
+left.BorderSizePixel = 0
+
+left.ZIndex = 12
+
+left.Parent = frame
+
+
+
+local right = Instance.new("Frame")
+
+right.Size = UDim2.new(0.31, 0, 0, 2)
+
+right.Position = UDim2.new(1, 0, 0.5, -1)
+
+right.AnchorPoint = Vector2.new(1, 0.5)
+
+right.BackgroundColor3 = COLORS.DeepBlue
+
+right.BackgroundTransparency = 0.25
+
+right.BorderSizePixel = 0
+
+right.ZIndex = 12
+
+right.Parent = frame
+
+
+
+local label = Instance.new("TextLabel")
+
+label.Size = UDim2.new(0.38, 0, 1, 0)
+
+label.Position = UDim2.new(0.31, 0, 0, 0)
+
+label.BackgroundTransparency = 1
+
+label.Text = text
+
+label.TextColor3 = COLORS.DeepBlue
+
+label.TextSize = 10
+
+label.Font = Enum.Font.GothamBold
+
+label.ZIndex = 13
+
+label.Parent = frame
+
+end
+
+
+
+local function makeBoolRow(labelText, getValue, setValue)
+
+rowOrder += 1
+
+
+
+local row = Instance.new("Frame")
+
+row.Size = UDim2.new(1, 0, 0, 34)
+
+row.BackgroundTransparency = 1
+
+row.LayoutOrder = rowOrder
+
+row.ZIndex = 12
+
+row.Parent = listFrame
+
+
+
+local label = Instance.new("TextLabel")
+
+label.Size = UDim2.new(0.62, 0, 1, 0)
+
+label.Position = UDim2.fromOffset(8, 0)
+
+label.BackgroundTransparency = 1
+
+label.Text = labelText
+
+label.TextColor3 = COLORS.Text
+
+label.TextSize = 13
+
+label.Font = Enum.Font.GothamBold
+
+label.TextXAlignment = Enum.TextXAlignment.Left
+
+label.ZIndex = 13
+
+label.Parent = row
+
+
+
+local button = Instance.new("TextButton")
+
+button.Size = UDim2.fromOffset(68, 25)
+
+button.Position = UDim2.new(1, -76, 0.5, -12)
+
+button.BackgroundColor3 = COLORS.DeepBlue
+
+button.TextColor3 = COLORS.White
+
+button.TextSize = 11
+
+button.Font = Enum.Font.GothamBold
+
+button.BorderSizePixel = 0
+
+button.AutoButtonColor = false
+
+button.ZIndex = 13
+
+button.Parent = row
+
+
+
+local corner = Instance.new("UICorner")
+
+corner.CornerRadius = UDim.new(0, 7)
+
+corner.Parent = button
+
+
+
+local function refresh()
+
+local enabled = getValue()
+
+
+
+button.Text = enabled and "ON" or "OFF"
+
+button.BackgroundColor3 =
+
+enabled and COLORS.Blue or COLORS.DeepBlue
+
+end
+
+
+
+refresh()
+
+
+
+connect(button.MouseButton1Click, function()
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+setValue(not getValue())
+
+refresh()
+
+end)
+
+
+
+return refresh
+
+end
+
+
+
+local function makeSliderRow(
+
+labelText,
+
+minValue,
+
+maxValue,
+
+getValue,
+
+setValue,
+
+format
+
+)
+
+rowOrder += 1
+
+
+
+local card = Instance.new("Frame")
+
+card.Size = UDim2.new(1, 0, 0, 48)
+
+card.BackgroundColor3 = Color3.fromRGB(235, 248, 255)
+
+card.BackgroundTransparency = 0.18
+
+card.BorderSizePixel = 0
+
+card.LayoutOrder = rowOrder
+
+card.ZIndex = 12
+
+card.Parent = listFrame
+
+
+
+local corner = Instance.new("UICorner")
+
+corner.CornerRadius = UDim.new(0, 9)
+
+corner.Parent = card
+
+
+
+local label = Instance.new("TextLabel")
+
+label.Size = UDim2.new(0.62, 0, 0, 17)
+
+label.Position = UDim2.fromOffset(10, 4)
+
+label.BackgroundTransparency = 1
+
+label.Text = labelText
+
+label.TextColor3 = COLORS.Text
+
+label.TextSize = 11
+
+label.Font = Enum.Font.GothamBold
+
+label.TextXAlignment = Enum.TextXAlignment.Left
+
+label.ZIndex = 13
+
+label.Parent = card
+
+
+
+local valueLabel = Instance.new("TextLabel")
+
+valueLabel.Size = UDim2.new(0.34, -8, 0, 17)
+
+valueLabel.Position = UDim2.new(0.66, 0, 0, 4)
+
+valueLabel.BackgroundTransparency = 1
+
+valueLabel.TextColor3 = COLORS.DeepBlue
+
+valueLabel.TextSize = 11
+
+valueLabel.Font = Enum.Font.GothamBold
+
+valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+valueLabel.ZIndex = 13
+
+valueLabel.Parent = card
+
+
+
+local track = Instance.new("Frame")
+
+track.Size = UDim2.new(1, -20, 0, 6)
+
+track.Position = UDim2.fromOffset(10, 31)
+
+track.BackgroundColor3 = COLORS.BabyBlue
+
+track.BorderSizePixel = 0
+
+track.Active = true
+
+track.ZIndex = 13
+
+track.Parent = card
+
+
+
+local trackCorner = Instance.new("UICorner")
+
+trackCorner.CornerRadius = UDim.new(1, 0)
+
+trackCorner.Parent = track
+
+
+
+local fill = Instance.new("Frame")
+
+fill.BackgroundColor3 = COLORS.DeepBlue
+
+fill.BorderSizePixel = 0
+
+fill.ZIndex = 14
+
+fill.Parent = track
+
+
+
+local fillCorner = Instance.new("UICorner")
+
+fillCorner.CornerRadius = UDim.new(1, 0)
+
+fillCorner.Parent = fill
+
+
+
+local knob = Instance.new("Frame")
+
+knob.Size = UDim2.fromOffset(13, 13)
+
+knob.AnchorPoint = Vector2.new(0.5, 0.5)
+
+knob.BackgroundColor3 = COLORS.White
+
+knob.BorderSizePixel = 0
+
+knob.ZIndex = 15
+
+knob.Parent = track
+
+
+
+local knobCorner = Instance.new("UICorner")
+
+knobCorner.CornerRadius = UDim.new(1, 0)
+
+knobCorner.Parent = knob
+
+
+
+local sliding = false
+
+
+
+local function refresh(value)
+
+value = math.clamp(value, minValue, maxValue)
+
+
+
+local alpha = 0
+
+
+
+if maxValue > minValue then
+
+alpha =
+
+(value - minValue)
+
+/ (maxValue - minValue)
+
+end
+
+
+
+fill.Size = UDim2.new(alpha, 0, 1, 0)
+
+knob.Position = UDim2.new(alpha, 0, 0.5, 0)
+
+valueLabel.Text = string.format(format, value)
+
+end
+
+
+
+refresh(getValue())
+
+
+
+local function update(input)
+
+local width = track.AbsoluteSize.X
+
+
+
+if width <= 0 then
+
+return
+
+end
+
+
+
+local alpha =
+
+math.clamp(
+
+(input.Position.X - track.AbsolutePosition.X)
+
+/ width,
+
+0,
+
+1
+
+)
+
+
+
+local value =
+
+minValue
+
++ (maxValue - minValue) * alpha
+
+
+
+value = math.round(value)
+
+
+
+setValue(value)
+
+refresh(value)
+
+end
+
+
+
+connect(track.InputBegan, function(input)
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+if input.UserInputType == Enum.UserInputType.MouseButton1
+
+or input.UserInputType == Enum.UserInputType.Touch then
+
+sliding = true
+
+update(input)
+
+end
+
+end)
+
+
+
+connect(UserInputService.InputChanged, function(input)
+
+if not sliding or scriptKilled then
+
+return
+
+end
+
+
+
+if input.UserInputType == Enum.UserInputType.MouseMovement
+
+or input.UserInputType == Enum.UserInputType.Touch then
+
+update(input)
+
+end
+
+end)
+
+
+
+connect(UserInputService.InputEnded, function(input)
+
+if input.UserInputType == Enum.UserInputType.MouseButton1
+
+or input.UserInputType == Enum.UserInputType.Touch then
+
+sliding = false
+
+end
+
+end)
+
+end
+
+
+
+-- football
+
+
+
+local function isFootball(obj)
+
+if not obj or not obj:IsA("BasePart") then
+
+return false
+
+end
+
+
+
+local name = obj.Name:lower()
+
+
+
+return name == "football"
+
+or name == "footballmain"
+
+or name == "pigskin"
+
+or string.find(name, "football") ~= nil
+
+end
+
+
+
+local function findFootball()
+
+if cachedFootball
+
+and cachedFootball.Parent
+
+and isFootball(cachedFootball) then
+
+return cachedFootball
+
+end
+
+
+
+for _, obj in ipairs(Workspace:GetDescendants()) do
+
+if isFootball(obj) then
+
+cachedFootball = obj
+
+return obj
+
+end
+
+end
+
+
+
+cachedFootball = nil
+
+return nil
+
+end
+
+
+
+connect(Workspace.DescendantAdded, function(obj)
+
+if isFootball(obj) then
+
+cachedFootball = obj
+
+lastBallPosition = obj.Position
+
+end
+
+end)
+
+
+
+-- aura
+
+
+
+local dotsHolder = Instance.new("Folder")
+
+dotsHolder.Name = "CatchDots"
+
+dotsHolder.Parent = gui
+
+
+
+local function isCatchBall(v)
+
+if not v or not v:IsA("BasePart") then
+
+return false
+
+end
+
+
+
+local n = v.Name:lower()
+
+
+
+return n == "football"
+
+or n == "footballmain"
+
+or n == "pigskin"
+
+or string.find(n, "football") ~= nil
+
+end
+
+
+
+connect(Workspace.DescendantAdded, function(obj)
+
+if not footballAuraEnabled then
+
+return
+
+end
+
+
+
+if not isCatchBall(obj) then
+
+return
+
+end
+
+
+
+catchBall = obj
+
+catchHolding = false
+
+lastCatchBallScan = os.clock()
+
+end)
+
+
+
+connect(Workspace.DescendantRemoving, function(obj)
+
+if obj == catchBall then
+
+catchBall = nil
+
+catchHolding = false
+
+lastCatchBallScan = 0
+
+end
+
+end)
+
+
+
+local function reacquireCatchBall()
+
+if not footballAuraEnabled then
+
+return nil
+
+end
+
+
+
+if catchBall
+
+and catchBall.Parent
+
+and isCatchBall(catchBall) then
+
+return catchBall
+
+end
+
+
+
+local now = os.clock()
+
+
+
+if now - lastCatchBallScan < 0.25 then
+
+return nil
+
+end
+
+
+
+lastCatchBallScan = now
+
+
+
+for _, obj in ipairs(Workspace:GetDescendants()) do
+
+if isCatchBall(obj) then
+
+catchBall = obj
+
+catchHolding = false
+
+return obj
+
+end
+
+end
+
+
+
+catchBall = nil
+
+return nil
+
+end
+
+
+
+local function clearCatchDots()
+
+for _, dot in ipairs(catchDots) do
+
+if dot then
+
+dot:Destroy()
+
+end
+
+end
+
+
+
+for _, anchor in ipairs(catchDotAnchors) do
+
+if anchor then
+
+anchor:Destroy()
+
+end
+
+end
+
+
+
+table.clear(catchDots)
+
+table.clear(catchDotAnchors)
+
+end
+
+
+
+local function hideCatchDots()
+
+for _, dot in ipairs(catchDots) do
+
+if dot then
+
+dot.Enabled = false
+
+end
+
+end
+
+end
+
+
+
+local function makeCatchDots(ball)
+
+if not footballAuraEnabled or not ball then
+
+hideCatchDots()
+
+return
+
+end
+
+
+
+if #catchDots == 20 and #catchDotAnchors == 20 then
+
+for i, dot in ipairs(catchDots) do
+
+if dot then
+
+dot.Adornee = catchDotAnchors[i]
+
+dot.Enabled = true
+
+end
+
+end
+
+return
+
+end
+
+
+
+clearCatchDots()
+
+
+
+local gold = math.pi * (3 - math.sqrt(5))
+
+
+
+for i = 1, 20 do
+
+local anchor = Instance.new("Part")
+
+
+
+anchor.Name = "CatchDotAnchor_" .. i
+
+anchor.Size = Vector3.new(0.05, 0.05, 0.05)
+
+anchor.Transparency = 1
+
+anchor.Anchored = true
+
+anchor.CanCollide = false
+
+anchor.CanTouch = false
+
+anchor.CanQuery = false
+
+anchor.CastShadow = false
+
+anchor.Position = ball.Position
+
+anchor.Parent = Workspace
+
+
+
+catchDotAnchors[i] = anchor
+
+
+
+local bb = Instance.new("BillboardGui")
+
+
+
+bb.Name = "CatchDot_" .. i
+
+bb.Size = UDim2.new(0.13, 0, 0.13, 0)
+
+bb.AlwaysOnTop = true
+
+bb.LightInfluence = 0
+
+bb.MaxDistance = 400
+
+bb.Adornee = anchor
+
+bb.Parent = dotsHolder
+
+
+
+local y =
+
+1 - ((i - 1) / 19) * 2
+
+
+
+local radius =
+
+math.sqrt(math.max(0, 1 - y * y))
+
+
+
+local theta =
+
+gold * (i - 1)
+
+
+
+local rad =
+
+1.05 + (i % 4) * 0.12
+
+
+
+local offset = Vector3.new(
+
+math.cos(theta) * radius * rad,
+
+y * rad * 0.55,
+
+math.sin(theta) * radius * rad
+
+)
+
+
+
+anchor.CFrame =
+
+CFrame.new(ball.Position + offset)
+
+
+
+local dot = Instance.new("Frame")
+
+dot.Size = UDim2.fromScale(1, 1)
+
+dot.BackgroundColor3 = CATCH_DOT_COLS[i]
+
+dot.BorderSizePixel = 0
+
+dot.Parent = bb
+
+
+
+local corner = Instance.new("UICorner")
+
+corner.CornerRadius = UDim.new(1, 0)
+
+corner.Parent = dot
+
+
+
+catchDots[i] = bb
+
+end
+
+end
+
+
+
+local function spinCatchDots()
+
+if not footballAuraEnabled
+
+or not catchBall
+
+or not catchBall.Parent then
+
+return
+
+end
+
+
+
+local gold = math.pi * (3 - math.sqrt(5))
+
+local t = os.clock() * 1.6
+
+
+
+for i, dot in ipairs(catchDots) do
+
+local anchor = catchDotAnchors[i]
+
+
+
+if dot and anchor then
+
+local y =
+
+1 - ((i - 1) / 19) * 2
+
+
+
+local radius =
+
+math.sqrt(math.max(0, 1 - y * y))
+
+
+
+local theta =
+
+gold * (i - 1) + t
+
+
+
+local rad =
+
+1.05 + (i % 4) * 0.12
+
+
+
+local worldOffset = Vector3.new(
+
+math.cos(theta) * radius * rad,
+
+y * rad * 0.55,
+
+math.sin(theta) * radius * rad
+
+)
+
+
+
+anchor.CFrame =
+
+CFrame.new(
+
+catchBall.Position + worldOffset
+
+)
+
+
+
+dot.Enabled = true
+
+end
+
+end
+
+end
+
+
+
+local function armPos(char, names)
+
+for _, name in ipairs(names) do
+
+local p = char:FindFirstChild(name, true)
+
+
+
+if p and p:IsA("BasePart") then
+
+return p.Position
+
+end
+
+end
+
+
+
+return nil
+
+end
+
+
+
+local function getCatchTarget(char)
+
+local hrp =
+
+char:FindFirstChild("HumanoidRootPart")
+
+
+
+if not hrp then
+
+return nil
+
+end
+
+
+
+local look = hrp.CFrame.LookVector
+
+
+
+local offset =
+
+look * 0.4
+
++ Vector3.new(0, 0.2, 0)
+
+
+
+local right = armPos(char, {
+
+"RightHand",
+
+"RightLowerArm",
+
+"RightUpperArm",
+
+"Right Arm",
+
+"RightArm",
+
+})
+
+
+
+local left = armPos(char, {
+
+"LeftHand",
+
+"LeftLowerArm",
+
+"LeftUpperArm",
+
+"Left Arm",
+
+"LeftArm",
+
+})
+
+
+
+if right then
+
+right += offset
+
+end
+
+
+
+if left then
+
+left += offset
+
+end
+
+
+
+if right and left and catchBall then
+
+if (catchBall.Position - left).Magnitude
+
+< (catchBall.Position - right).Magnitude then
+
+return left
+
+end
+
+
+
+return right
+
+end
+
+
+
+return right
+
+or left
+
+or hrp.Position
+
++ Vector3.new(0, 0.75, 0)
+
++ look * 0.55
+
+end
+
+
+
+local function isBallOnMe(ball, char)
+
+if not ball or not char then
+
+return false
+
+end
+
+
+
+if ball:IsDescendantOf(char) then
+
+return true
+
+end
+
+
+
+for _, w in ipairs(ball:GetChildren()) do
+
+if w:IsA("Weld")
+
+or w:IsA("WeldConstraint")
+
+or w:IsA("Motor6D") then
+
+
+
+if (w.Part0 and w.Part0:IsDescendantOf(char))
+
+or (w.Part1 and w.Part1:IsDescendantOf(char)) then
+
+return true
+
+end
+
+end
+
+end
+
+
+
+return false
+
+end
+
+
+
+connect(RunService.RenderStepped, function()
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+if not footballAuraEnabled then
+
+hideCatchDots()
+
+return
+
+end
+
+
+
+pcall(function()
+
+if not catchBall
+
+or not catchBall.Parent
+
+or not isCatchBall(catchBall) then
+
+reacquireCatchBall()
+
+end
+
+
+
+if catchBall
+
+and catchBall.Parent
+
+and isCatchBall(catchBall) then
+
+makeCatchDots(catchBall)
+
+spinCatchDots()
+
+else
+
+hideCatchDots()
+
+end
+
+end)
+
+end)
+
+
+
+local function updateBallCatch(dt)
+
+if not footballAuraEnabled then
+
+hideCatchDots()
+
+return
+
+end
+
+
+
+local char = player.Character
+
+
+
+if not char then
+
+return
+
+end
+
+
+
+if not catchBall
+
+or not catchBall.Parent
+
+or not isCatchBall(catchBall) then
+
+
+
+catchHolding = false
+
+
+
+if not reacquireCatchBall() then
+
+return
+
+end
+
+end
+
+
+
+makeCatchDots(catchBall)
+
+spinCatchDots()
+
+
+
+local target = getCatchTarget(char)
+
+
+
+if not target then
+
+return
+
+end
+
+
+
+local distance =
+
+(catchBall.Position - target).Magnitude
+
+
+
+if isBallOnMe(catchBall, char) then
+
+catchHolding = true
+
+else
+
+catchHolding = false
+
+end
+
+
+
+if catchHolding then
+
+return
+
+end
+
+
+
+if distance > catchRange then
+
+return
+
+end
+
+
+
+if os.clock() - catchLastPhys > 1 then
+
+catchLastPhys = os.clock()
+
+
+
+pcall(function()
+
+catchBall.CustomPhysicalProperties =
+
+PhysicalProperties.new(
+
+0.85,
+
+1.35,
+
+0.18,
+
+2,
+
+1
+
+)
+
+end)
+
+end
+
+
+
+if distance <= CATCH_LOCK_DIST then
+
+pcall(function()
+
+catchBall.CFrame =
+
+CFrame.new(target)
+
+
+
+catchBall.AssemblyLinearVelocity =
+
+Vector3.zero
+
+
+
+catchBall.AssemblyAngularVelocity =
+
+Vector3.zero
+
+end)
+
+
+
+catchHolding = true
+
+return
+
+end
+
+
+
+local direction =
+
+target - catchBall.Position
+
+
+
+if direction.Magnitude > 0.08 then
+
+local strength =
+
+1 - math.clamp(
+
+distance / catchRange,
+
+0,
+
+1
+
+)
+
+
+
+local add =
+
+direction.Unit
+
+* catchPull
+
+* (0.7 + strength)
+
+* math.clamp(
+
+dt * 60,
+
+0.5,
+
+2
+
+)
+
+
+
+catchBall.AssemblyLinearVelocity += add
+
+end
+
+end
+
+
+
+-- pull sticky
+
+
+
+local function closestPlayer()
+
+if not rootPart then
+
+return nil
+
+end
+
+
+
+local nearest
+
+local nearestDistance = 35
+
+
+
+for _, other in ipairs(Players:GetPlayers()) do
+
+if other ~= player
+
+and other.Character then
+
+
+
+local hrp =
+
+other.Character:FindFirstChild(
+
+"HumanoidRootPart"
+
+)
+
+
+
+local hum =
+
+other.Character:FindFirstChildOfClass(
+
+"Humanoid"
+
+)
+
+
+
+if hrp
+
+and hum
+
+and hum.Health > 0 then
+
+
+
+local distance =
+
+(hrp.Position - rootPart.Position).Magnitude
+
+
+
+if distance < nearestDistance then
+
+nearestDistance = distance
+
+nearest = other
+
+end
+
+end
+
+end
+
+end
+
+
+
+return nearest
+
+end
+
+
+
+connect(RunService.Heartbeat, function()
+
+if scriptKilled
+
+or not pullStickyEnabled
+
+or not rootPart
+
+or not humanoid then
+
+return
+
+end
+
+
+
+if humanoid.FloorMaterial ~= Enum.Material.Air then
+
+return
+
+end
+
+
+
+local target = closestPlayer()
+
+
+
+if not target
+
+or not target.Character then
+
+return
+
+end
+
+
+
+local head =
+
+target.Character:FindFirstChild("Head")
+
+
+
+if not head then
+
+return
+
+end
+
+
+
+local offset =
+
+head.Position
+
++ Vector3.new(0, 1.6, 0)
+
+- rootPart.Position
+
+
+
+local distance = offset.Magnitude
+
+
+
+local velocity =
+
+rootPart.AssemblyLinearVelocity
+
+
+
+if distance > 2.5 and pullStrength > 0 then
+
+local desired =
+
+offset.Unit
+
+* (pullStrength * 18)
+
+
+
+rootPart.AssemblyLinearVelocity =
+
+Vector3.new(
+
+velocity.X
+
++ (desired.X - velocity.X) * 0.25,
+
+velocity.Y,
+
+velocity.Z
+
++ (desired.Z - velocity.Z) * 0.25
+
+)
+
+end
+
+
+
+if distance <= 3 and stickiness > 0 then
+
+local horizontal =
+
+Vector3.new(
+
+offset.X,
+
+0,
+
+offset.Z
+
+)
+
+
+
+if horizontal.Magnitude > 0.01 then
+
+rootPart.AssemblyLinearVelocity +=
+
+horizontal.Unit * stickiness
+
+end
+
+end
+
+end)
+
+
+
+-- arm
+
+
+
+local function getRightShoulder(char)
+
+local shoulder =
+
+char:FindFirstChild(
+
+"Right Shoulder",
+
+true
+
+)
+
+or char:FindFirstChild(
+
+"RightShoulder",
+
+true
+
+)
+
+
+
+if shoulder and shoulder:IsA("Motor6D") then
+
+if shoulder ~= trackedShoulder then
+
+trackedShoulder = shoulder
+
+originalC0 = shoulder.C0
+
+end
+
+
+
+return shoulder
+
+end
+
+
+
+return nil
+
+end
+
+
+
+local function resetShoulder()
+
+if trackedShoulder and originalC0 then
+
+pcall(function()
+
+trackedShoulder.C0 = originalC0
+
+end)
+
+end
+
+end
+
+
+
+connect(UserInputService.InputBegan, function(input)
+
+if input.UserInputType == Enum.UserInputType.MouseButton1
+
+or input.UserInputType == Enum.UserInputType.Touch
+
+or input.KeyCode == Enum.KeyCode.ButtonR2 then
+
+isClicking = true
+
+end
+
+end)
+
+
+
+connect(UserInputService.InputEnded, function(input)
+
+if input.UserInputType == Enum.UserInputType.MouseButton1
+
+or input.UserInputType == Enum.UserInputType.Touch
+
+or input.KeyCode == Enum.KeyCode.ButtonR2 then
+
+isClicking = false
+
+end
+
+end)
+
+
+
+connect(RunService.RenderStepped, function()
+
+if scriptKilled
+
+or not armExtenderEnabled then
+
+return
+
+end
+
+
+
+local char = player.Character
+
+
+
+if not char then
+
+return
+
+end
+
+
+
+local shoulder =
+
+getRightShoulder(char)
+
+
+
+local hrp =
+
+char:FindFirstChild(
+
+"HumanoidRootPart"
+
+)
+
+
+
+if not shoulder
+
+or not hrp
+
+or not originalC0 then
+
+return
+
+end
+
+
+
+local now = os.clock()
+
+
+
+if not cachedFootball
+
+or not cachedFootball.Parent
+
+or now - lastScanTime >= SCAN_INTERVAL then
+
+
+
+lastScanTime = now
+
+cachedFootball = findFootball()
+
+end
+
+
+
+local football = cachedFootball
+
+
+
+if not football then
+
+resetShoulder()
+
+return
+
+end
+
+
+
+lastBallPosition = football.Position
+
+
+
+if isClicking then
+
+local direction =
+
+football.Position - hrp.Position
+
+
+
+local distance =
+
+direction.Magnitude
+
+
+
+if distance <= MAX_ARM_REACH
+
+and distance > 0.001 then
+
+
+
+local localDirection =
+
+hrp.CFrame:VectorToObjectSpace(
+
+direction.Unit
+
+)
+
+
+
+local stretch =
+
+CFrame.new(
+
+localDirection.X * ARM_EXTENSION,
+
+localDirection.Y * ARM_EXTENSION,
+
+localDirection.Z * ARM_EXTENSION
+
+)
+
+
+
+shoulder.C0 =
+
+shoulder.C0:Lerp(
+
+originalC0 * stretch,
+
+0.5
+
+)
+
+
+
+return
+
+end
+
+end
+
+
+
+shoulder.C0 = originalC0
+
+end)
+
+
+
+-- boost
+
+
+
+local function isOnTopOfPart(part)
+
+if not rootPart
+
+or not part
+
+or not part:IsA("BasePart") then
+
+return false
+
+end
+
+
+
+local relative =
+
+part.CFrame:PointToObjectSpace(
+
+rootPart.Position
+
+)
+
+
+
+local halfX =
+
+part.Size.X / 2
+
+
+
+local halfZ =
+
+part.Size.Z / 2
+
+
+
+if math.abs(relative.X) > halfX + 1 then
+
+return false
+
+end
+
+
+
+if math.abs(relative.Z) > halfZ + 1 then
+
+return false
+
+end
+
+
+
+local topY =
+
+part.Position.Y
+
++ part.Size.Y / 2
+
+
+
+local rootBottomY =
+
+rootPart.Position.Y - 2.5
+
+
+
+local verticalDistance =
+
+rootBottomY - topY
+
+
+
+return verticalDistance >= -1.5
+
+and verticalDistance <= TOP_CONTACT_TOLERANCE
+
+end
+
+
+
+local function isOnTopOfPlayer(other)
+
+local targetCharacter = other.Character
+
+
+
+if not targetCharacter then
+
+return false
+
+end
+
+
+
+local head =
+
+targetCharacter:FindFirstChild("Head")
+
+
+
+if head and isOnTopOfPart(head) then
+
+return true
+
+end
+
+
+
+local upperTorso =
+
+targetCharacter:FindFirstChild("UpperTorso")
+
+
+
+if upperTorso and isOnTopOfPart(upperTorso) then
+
+return true
+
+end
+
+
+
+return false
+
+end
+
+
+
+local function performBoost()
+
+if scriptKilled
+
+or not boostEnabled
+
+or not isAirborne
+
+or boostedThisJump
+
+or not rootPart then
+
+return
+
+end
+
+
+
+local actualBoost = getActualBoostStrength()
+
+
+
+if actualBoost <= 0 then
+
+return
+
+end
+
+
+
+for _, targetPlayer in ipairs(Players:GetPlayers()) do
+
+if targetPlayer ~= player
+
+and targetPlayer.Parent == Players then
+
+
+
+if isOnTopOfPlayer(targetPlayer) then
+
+boostedThisJump = true
+
+
+
+local velocity =
+
+rootPart.AssemblyLinearVelocity
+
+
+
+rootPart.AssemblyLinearVelocity =
+
+Vector3.new(
+
+velocity.X,
+
+actualBoost,
+
+velocity.Z
+
+)
+
+
+
+return
+
+end
+
+end
+
+end
+
+end
+
+
+
+connect(RunService.Heartbeat, function()
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+pcall(performBoost)
+
+end)
+
+
+
+-- dive
+
+
+
+local function updateDivePower()
+
+if scriptKilled or not diveEnabled then
+
+return
+
+end
+
+
+
+local gameId = player:FindFirstChild("Replicated")
+
+and player.Replicated:FindFirstChild("GameID")
+
+
+
+if not gameId then
+
+return
+
+end
+
+
+
+local gid = gameId.Value
+
+local actualDive = getActualDiveStrength()
+
+
+
+if actualDive <= 0 then
+
+return
+
+end
+
+
+
+local function updateFolder(folder)
+
+if not folder then
+
+return
+
+end
+
+
+
+local gameFolder =
+
+folder:FindFirstChild(gid)
+
+
+
+if not gameFolder then
+
+return
+
+end
+
+
+
+local gameParams =
+
+gameFolder:FindFirstChild("GameParams")
+
+
+
+if not gameParams then
+
+return
+
+end
+
+
+
+local divePowerValue =
+
+gameParams:FindFirstChild("DivePower")
+
+
+
+if divePowerValue
+
+and divePowerValue:IsA("NumberValue") then
+
+
+
+divePowerValue.Value =
+
+actualDive
+
+end
+
+end
+
+
+
+updateFolder(
+
+ReplicatedStorage:FindFirstChild("Games")
+
+)
+
+
+
+updateFolder(
+
+ReplicatedStorage:FindFirstChild("MiniGames")
+
+)
+
+end
+
+
+
+local function resetDivePower()
+
+local gameId = player:FindFirstChild("Replicated")
+
+and player.Replicated:FindFirstChild("GameID")
+
+
+
+if not gameId then
+
+return
+
+end
+
+
+
+local gid = gameId.Value
+
+
+
+local function resetFolder(folder)
+
+if not folder then
+
+return
+
+end
+
+
+
+local gameFolder =
+
+folder:FindFirstChild(gid)
+
+
+
+if not gameFolder then
+
+return
+
+end
+
+
+
+local gameParams =
+
+gameFolder:FindFirstChild("GameParams")
+
+
+
+if not gameParams then
+
+return
+
+end
+
+
+
+local divePowerValue =
+
+gameParams:FindFirstChild("DivePower")
+
+
+
+if divePowerValue
+
+and divePowerValue:IsA("NumberValue") then
+
+
+
+divePowerValue.Value = 2.2
+
+end
+
+end
+
+
+
+resetFolder(
+
+ReplicatedStorage:FindFirstChild("Games")
+
+)
+
+
+
+resetFolder(
+
+ReplicatedStorage:FindFirstChild("MiniGames")
+
+)
+
+end
+
+
+
+connect(RunService.Heartbeat, function()
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+pcall(updateDivePower)
+
+end)
+
+
+
+-- rows
+
+
+
+local refreshPullSticky
+
+local refreshBoost
+
+local refreshDive
+
+local refreshArmExtender
+
+local refreshAura
+
+
+
+makeSeparator("PULL STICKY")
+
+
+
+refreshPullSticky = makeBoolRow(
+
+"Pull Sticky",
+
+function()
+
+return pullStickyEnabled
+
+end,
+
+function(value)
+
+pullStickyEnabled = value
+
+end
+
+)
+
+
+
+makeSliderRow(
+
+"Pull Strength",
+
+0,
+
+5,
+
+function()
+
+return pullStrength
+
+end,
+
+function(value)
+
+pullStrength =
+
+math.clamp(
+
+math.round(value),
+
+0,
+
+5
+
+)
+
+end,
+
+"%.0f"
+
+)
+
+
+
+makeSliderRow(
+
+"Stickiness",
+
+0,
+
+15,
+
+function()
+
+return stickiness
+
+end,
+
+function(value)
+
+stickiness =
+
+math.clamp(
+
+math.round(value),
+
+0,
+
+15
+
+)
+
+end,
+
+"%.0f"
+
+)
+
+
+
+makeSeparator("BOOST")
+
+
+
+refreshBoost = makeBoolRow(
+
+"Boost",
+
+function()
+
+return boostEnabled
+
+end,
+
+function(value)
+
+boostEnabled = value
+
+
+
+if not value then
+
+boostedThisJump = false
+
+end
+
+end
+
+)
+
+
+
+makeSliderRow(
+
+"Boost Strength",
+
+MIN_DISPLAY_BOOST,
+
+MAX_DISPLAY_BOOST,
+
+function()
+
+return boostStrength
+
+end,
+
+function(value)
+
+boostStrength =
+
+math.clamp(
+
+math.round(value),
+
+MIN_DISPLAY_BOOST,
+
+MAX_DISPLAY_BOOST
+
+)
+
+end,
+
+"%.0f"
+
+)
+
+
+
+makeSeparator("DIVE BOOST")
+
+
+
+refreshDive = makeBoolRow(
+
+"Dive Boost",
+
+function()
+
+return diveEnabled
+
+end,
+
+function(value)
+
+diveEnabled = value
+
+
+
+if not value then
+
+resetDivePower()
+
+else
+
+updateDivePower()
+
+end
+
+end
+
+)
+
+
+
+makeSliderRow(
+
+"Dive Strength",
+
+MIN_DISPLAY_DIVE,
+
+MAX_DISPLAY_DIVE,
+
+function()
+
+return diveBoostPower
+
+end,
+
+function(value)
+
+diveBoostPower =
+
+math.clamp(
+
+math.round(value),
+
+MIN_DISPLAY_DIVE,
+
+MAX_DISPLAY_DIVE
+
+)
+
+
+
+updateDivePower()
+
+end,
+
+"%.0f"
+
+)
+
+
+
+makeSeparator("ARM EXTENDER")
+
+
+
+refreshArmExtender = makeBoolRow(
+
+"Arm Extender",
+
+function()
+
+return armExtenderEnabled
+
+end,
+
+function(value)
+
+armExtenderEnabled = value
+
+
+
+if not value then
+
+resetShoulder()
+
+trackedShoulder = nil
+
+originalC0 = nil
+
+cachedFootball = nil
+
+lastBallPosition = nil
+
+lastScanTime = 0
+
+end
+
+end
+
+)
+
+
+
+makeSeparator("FOOTBALL AURA")
+
+
+
+refreshAura = makeBoolRow(
+
+"Football Aura",
+
+function()
+
+return footballAuraEnabled
+
+end,
+
+function(value)
+
+footballAuraEnabled = value
+
+
+
+if not value then
+
+hideCatchDots()
+
+catchHolding = false
+
+else
+
+catchHolding = false
+
+catchScanWait = 0
+
+lastCatchBallScan = 0
+
+
+
+if not catchBall
+
+or not catchBall.Parent
+
+or not isCatchBall(catchBall) then
+
+reacquireCatchBall()
+
+end
+
+
+
+if catchBall
+
+and catchBall.Parent
+
+and isCatchBall(catchBall) then
+
+makeCatchDots(catchBall)
+
+else
+
+hideCatchDots()
+
+end
+
+end
+
+end
+
+)
+
+
+
+-- kill
+
+
+
+rowOrder += 1
+
+
+
+local killRow = Instance.new("Frame")
+
+killRow.Size = UDim2.new(1, 0, 0, 40)
+
+killRow.BackgroundTransparency = 1
+
+killRow.LayoutOrder = rowOrder
+
+killRow.ZIndex = 12
+
+killRow.Parent = listFrame
+
+
+
+local killButton = Instance.new("TextButton")
+
+killButton.Size = UDim2.new(1, -16, 0, 30)
+
+killButton.Position = UDim2.new(0, 8, 0.5, -15)
+
+killButton.BackgroundColor3 = COLORS.DeepBlue
+
+killButton.TextColor3 = COLORS.White
+
+killButton.Text = "KILL SCRIPT"
+
+killButton.TextSize = 12
+
+killButton.Font = Enum.Font.GothamBold
+
+killButton.BorderSizePixel = 0
+
+killButton.AutoButtonColor = false
+
+killButton.ZIndex = 13
+
+killButton.Parent = killRow
+
+
+
+local killCorner = Instance.new("UICorner")
+
+killCorner.CornerRadius = UDim.new(0, 8)
+
+killCorner.Parent = killButton
+
+
+
+connect(killButton.MouseButton1Click, function()
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+pcall(resetDivePower)
+
+
+
+scriptKilled = true
+
+pullStickyEnabled = false
+
+boostEnabled = false
+
+diveEnabled = false
+
+armExtenderEnabled = false
+
+footballAuraEnabled = false
+
+boostedThisJump = false
+
+catchHolding = false
+
+isClicking = false
+
+
+
+resetShoulder()
+
+clearCatchDots()
+
+
+
+for _, connection in ipairs(connections) do
+
+if connection then
+
+pcall(function()
+
+connection:Disconnect()
+
+end)
+
+end
+
+end
+
+
+
+table.clear(connections)
+
+
+
+pcall(function()
+
+gui:Destroy()
+
+end)
+
+end)
+
+
+
+-- fade
+
+
+
+local guiVisible = true
+
+local fading = false
+
+local originalTransparency = {}
+
+
+
+local function saveTransparency(obj)
+
+if originalTransparency[obj] then
+
+return
+
+end
+
+
+
+if obj:IsA("Frame") then
+
+originalTransparency[obj] = {
+
+BackgroundTransparency =
+
+obj.BackgroundTransparency,
+
+}
+
+elseif obj:IsA("TextLabel")
+
+or obj:IsA("TextButton") then
+
+
+
+originalTransparency[obj] = {
+
+BackgroundTransparency =
+
+obj.BackgroundTransparency,
+
+
+
+TextTransparency =
+
+obj.TextTransparency,
+
+}
+
+elseif obj:IsA("UIStroke") then
+
+originalTransparency[obj] = {
+
+Transparency =
+
+obj.Transparency,
+
+}
+
+end
+
+end
+
+
+
+for _, obj in ipairs(gui:GetDescendants()) do
+
+saveTransparency(obj)
+
+end
+
+
+
+local fadeInfo = TweenInfo.new(
+
+0.25,
+
+Enum.EasingStyle.Quad,
+
+Enum.EasingDirection.Out
+
+)
+
+
+
+local function fadeGui(hidden)
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+for obj, values in pairs(originalTransparency) do
+
+if obj and obj.Parent then
+
+local goals = {}
+
+
+
+if obj:IsA("Frame") then
+
+goals.BackgroundTransparency =
+
+hidden
+
+and 1
+
+or values.BackgroundTransparency
+
+
+
+elseif obj:IsA("TextLabel")
+
+or obj:IsA("TextButton") then
+
+
+
+goals.BackgroundTransparency =
+
+hidden
+
+and 1
+
+or values.BackgroundTransparency
+
+
+
+goals.TextTransparency =
+
+hidden
+
+and 1
+
+or values.TextTransparency
+
+
+
+elseif obj:IsA("UIStroke") then
+
+goals.Transparency =
+
+hidden
+
+and 1
+
+or values.Transparency
+
+end
+
+
+
+TweenService:Create(
+
+obj,
+
+fadeInfo,
+
+goals
+
+):Play()
+
+end
+
+end
+
+end
+
+
+
+local function toggleMenu()
+
+if scriptKilled or fading then
+
+return
+
+end
+
+
+
+fading = true
+
+guiVisible = not guiVisible
+
+
+
+if guiVisible then
+
+gui.Enabled = true
+
+end
+
+
+
+fadeGui(not guiVisible)
+
+
+
+task.delay(0.25, function()
+
+if not scriptKilled then
+
+if not guiVisible then
+
+gui.Enabled = false
+
+end
+
+
+
+fading = false
+
+end
+
+end)
+
+end
+
+
+
+-- controls
+
+
+
+connect(UserInputService.InputBegan, function(input, gameProcessed)
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+local key = input.KeyCode
+
+
+
+if key == Enum.KeyCode.ButtonR1 then
+
+pullStickyEnabled =
+
+not pullStickyEnabled
+
+
+
+refreshPullSticky()
+
+return
+
+end
+
+
+
+if key == Enum.KeyCode.R
+
+and not gameProcessed then
+
+
+
+pullStickyEnabled =
+
+not pullStickyEnabled
+
+
+
+refreshPullSticky()
+
+return
+
+end
+
+
+
+if key == Enum.KeyCode.ButtonL1 then
+
+boostEnabled =
+
+not boostEnabled
+
+
+
+if not boostEnabled then
+
+boostedThisJump = false
+
+end
+
+
+
+refreshBoost()
+
+return
+
+end
+
+
+
+if key == Enum.KeyCode.T
+
+and not gameProcessed then
+
+
+
+boostEnabled =
+
+not boostEnabled
+
+
+
+if not boostEnabled then
+
+boostedThisJump = false
+
+end
+
+
+
+refreshBoost()
+
+return
+
+end
+
+
+
+if key == Enum.KeyCode.DPadRight
+
+or key == TOGGLE_KEY then
+
+toggleMenu()
+
+end
+
+end)
+
+
+
+-- character
+
+
+
+local function setupCharacter(char)
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+resetShoulder()
+
+
+
+character = char
+
+
+
+rootPart =
+
+char:WaitForChild(
+
+"HumanoidRootPart",
+
+5
+
+)
+
+
+
+humanoid =
+
+char:WaitForChild(
+
+"Humanoid",
+
+5
+
+)
+
+
+
+trackedShoulder = nil
+
+originalC0 = nil
+
+cachedFootball = nil
+
+lastBallPosition = nil
+
+lastScanTime = 0
+
+
+
+catchScanWait = 0
+
+catchHolding = false
+
+lastCatchBallScan = 0
+
+
+
+isAirborne = false
+
+boostedThisJump = false
+
+
+
+if humanoid then
+
+connect(
+
+humanoid.StateChanged,
+
+function(_, state)
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+if state ==
+
+Enum.HumanoidStateType.Jumping
+
+or state ==
+
+Enum.HumanoidStateType.Freefall then
+
+
+
+isAirborne = true
+
+
+
+elseif state ==
+
+Enum.HumanoidStateType.Landed
+
+or state ==
+
+Enum.HumanoidStateType.Running
+
+or state ==
+
+Enum.HumanoidStateType.RunningNoPhysics then
+
+
+
+isAirborne = false
+
+boostedThisJump = false
+
+end
+
+end
+
+)
+
+end
+
+end
+
+
+
+connect(player.CharacterAdded, function(char)
+
+task.wait(0.25)
+
+
+
+if not scriptKilled then
+
+setupCharacter(char)
+
+end
+
+end)
+
+
+
+if player.Character then
+
+setupCharacter(player.Character)
+
+end
+
+
+
+-- loops
+
+
+
+connect(RunService.Heartbeat, function(dt)
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+pcall(function()
+
+updateBallCatch(dt)
+
+end)
+
+end)
+
+
+
+connect(RunService.RenderStepped, function(dt)
+
+if scriptKilled then
+
+return
+
+end
+
+
+
+pcall(function()
+
+for _, data in ipairs(snowflakes) do
+
+local obj = data.Object
+
+
+
+if obj and obj.Parent then
+
+local pos = obj.Position
+
+
+
+local y =
+
+pos.Y.Scale
+
++ data.Speed * dt * 60
+
+
+
+local x =
+
+pos.X.Scale
+
++ data.Drift * dt * 60
+
+
+
+if y > 1.08 then
+
+y = -0.08
+
+x = math.random()
+
+end
+
+
+
+if x > 1.08 then
+
+x = -0.08
+
+elseif x < -0.08 then
+
+x = 1.08
+
+end
+
+
+
+obj.Position =
+
+UDim2.new(
+
+x,
+
+0,
+
+y,
+
+0
+
+)
+
+
+
+obj.Rotation +=
+
+data.Rotation * dt * 60
+
+end
+
+end
+
+end)
+
+end)
